@@ -69,10 +69,8 @@ func createPostView(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&post)
 	post_errors, valid := post.valid()
 	if valid {
-		err, created := createPost(post)
-		if created {
-			json.NewEncoder(w).Encode(newResponse(100, post, "Post Created Successfully"))
-		} else {
+		err := createPost(post)
+		if err != nil {
 			if err.Error() == "UNIQUE constraint failed: posts.title" {
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(newResponse(103, nil, "Post Title Already Exists"))
@@ -80,9 +78,27 @@ func createPostView(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(newResponse(103, err, "Unexpected Error"))
 			}
+		} else {
+			json.NewEncoder(w).Encode(newResponse(100, post, "Post Created Successfully"))
 		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(newResponse(103, post_errors, "Post data Invalid"))
+	}
+}
+
+func deletePostView(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "application/json")
+	params := mux.Vars(r)
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dbError := deletePost(id)
+	if dbError != nil {
+		json.NewEncoder(w).Encode(newResponse(103, dbError, "Error Deleting Post"))
+	} else {
+		json.NewEncoder(w).Encode(newResponse(100, nil, "Post Deleted Successfully"))
 	}
 }
