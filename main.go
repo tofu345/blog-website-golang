@@ -10,7 +10,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// TODO(tofu345) delete post data.
 // TODO(tofu345) Authorization
 
 var router *mux.Router
@@ -21,6 +20,7 @@ func main() {
 	router.HandleFunc("/api/posts", getBooksView).Methods("GET")
 	router.HandleFunc("/api/posts", createPostView).Methods("POST")
 	router.HandleFunc("/api/posts/{id}", getBookView).Methods("GET")
+	router.HandleFunc("/api/posts/{id}", updatePostView).Methods("PUT")
 	router.HandleFunc("/api/posts/{id}", deletePostView).Methods("DELETE")
 
 	loggedRouter := handlers.LoggingHandler(os.Stdout, router)

@@ -33,13 +33,9 @@ func createTable() {
 }
 
 func createPost(post Post) error {
-	records := `INSERT INTO posts(title, content, author, views) VALUES (?, ?, ?, ?)`
-	query, err := db.Prepare(records)
-	if err != nil {
-		log.Fatal(err)
-	}
+	_, err := db.Exec(`INSERT INTO posts(title, content, author, views) VALUES (?, ?, ?, ?)`,
+		post.Title, post.Content, post.Author, 0)
 
-	_, err = query.Exec(post.Title, post.Content, post.Author, 0)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -66,13 +62,12 @@ func getPostById(object_id int) (Post, error) {
 func deletePost(object_id int) error {
 	_, err := db.Exec("DELETE FROM posts WHERE id = ?", object_id)
 
-	if err != nil {
-		return err
-	} else {
-		return nil
-	}
+	return err
 }
 
-// func updatePost(object_id int, newPostData Post) error {
+func updatePost(object_id int, postData Post) error {
+	_, err := db.Exec("UPDATE posts SET title=?, content=?, author=? WHERE id=?",
+		postData.Title, postData.Content, postData.Author, object_id)
 
-// }
+	return err
+}

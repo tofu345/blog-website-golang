@@ -15,12 +15,16 @@ type Response struct {
 	Data         any    `json:"data"`
 }
 
-func newResponse(code int, data any, message string) Response {
-	return Response{
-		ResponseCode: code,
-		Data:         data,
-		Message:      message,
+func newResponse(w http.ResponseWriter, responseCode int, data any, message string) {
+	if responseCode == 103 {
+		w.WriteHeader(http.StatusBadRequest)
 	}
+	json.NewEncoder(w).Encode(
+		Response{
+			ResponseCode: responseCode,
+			Data:         data,
+			Message:      message,
+		})
 }
 
 func getBooksView(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +46,7 @@ func getBooksView(w http.ResponseWriter, r *http.Request) {
 		record.Scan(&id, &title, &content, &author, &views)
 		posts = append(posts, newPost(id, title, content, author, views))
 	}
-	json.NewEncoder(w).Encode(newResponse(100, posts, "Post List"))
+	newResponse(w, 100, posts, "Post List")
 }
 
 func getBookView(w http.ResponseWriter, r *http.Request) {
@@ -55,35 +59,33 @@ func getBookView(w http.ResponseWriter, r *http.Request) {
 
 	post, err := getPostById(id)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(newResponse(103, nil, "Post Not Found"))
+		newResponse(w, 103, nil, "Post Not Found")
 		return
 	}
 
-	json.NewEncoder(w).Encode(newResponse(100, post, "Post Detail"))
+	newResponse(w, 100, post, "Post Detail")
 }
 
 func createPostView(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "application/json")
 	var post Post
 	_ = json.NewDecoder(r.Body).Decode(&post)
-	post_errors, valid := post.valid()
+
+	postErrors, valid := post.valid()
 	if valid {
 		err := createPost(post)
 		if err != nil {
+			// TODO(tofu345) find a better way to do this
 			if err.Error() == "UNIQUE constraint failed: posts.title" {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(newResponse(103, nil, "Post Title Already Exists"))
+				newResponse(w, 103, nil, "Post Title Already Exists")
 			} else {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(newResponse(103, err, "Unexpected Error"))
+				newResponse(w, 103, err, "Unexpected Error")
 			}
 		} else {
-			json.NewEncoder(w).Encode(newResponse(100, post, "Post Created Successfully"))
+			newResponse(w, 100, post, "Post Created Successfully")
 		}
 	} else {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(newResponse(103, post_errors, "Post data Invalid"))
+		newResponse(w, 103, postErrors, "Post data Invalid")
 	}
 }
 
@@ -97,8 +99,41 @@ func deletePostView(w http.ResponseWriter, r *http.Request) {
 
 	dbError := deletePost(id)
 	if dbError != nil {
-		json.NewEncoder(w).Encode(newResponse(103, dbError, "Error Deleting Post"))
+		newResponse(w, 103, dbError, "Error Deleting Post")
 	} else {
-		json.NewEncoder(w).Encode(newResponse(100, nil, "Post Deleted Successfully"))
+		newResponse(w, 100, nil, "Post Deleted Successfully")
+	}
+}
+
+func updatePostView(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "application/json")
+	params := mux.Vars(r)
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check if post exists
+	_, e := getPostById(id)
+	if e != nil {
+		newResponse(w, 103, nil, "Post Not Found")
+	}
+
+	var post Post
+	_ = json.NewDecoder(r.Body).Decode(&post)
+	post.ID = id // Just in case the id is passed as post params
+
+	// Check if post is valid
+	postErrors, valid := post.valid()
+	if valid {
+		dbError := updatePost(id, post)
+		if dbError != nil {
+			log.Println(err)
+			newResponse(w, 103, dbError, "Error Updating Post")
+		} else {
+			newResponse(w, 100, post, "Post Updated Successfully")
+		}
+	} else {
+		newResponse(w, 103, postErrors, "Post data Invalid")
 	}
 }
